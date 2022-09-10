@@ -1,0 +1,1 @@
+Este apartado demuestra el uso de un modelo de regresion logistica utilizado para el data set de Iris 
