@@ -35,7 +35,7 @@ df['No_Species'] = 0
 df.loc[df['Species'] == 'Iris-setosa', 'No_Species'] = 0
 df.loc[df['Species'] == 'Iris-versicolor', 'No_Species'] = 1
 df.loc[df['Species'] == 'Iris-virginica', 'No_Species'] = 2
-df.head()
+df.head(60)
 
 df.describe()
 
@@ -55,7 +55,7 @@ sns.heatmap(pd.DataFrame(df).corr(), annot=True)
 plt.title('Correlation of Variables')
 plt.show()
 
-x = df[['Id','SepalLengthCm','SepalWidthCm','PetalLengthCm','PetalWidthCm']].values
+x = df[['SepalLengthCm','SepalWidthCm','PetalLengthCm','PetalWidthCm']].values
 classes = {'Iris-setosa': 0, 'Iris-versicolor': 1, 'Iris-virginica': 2}
 y = df['No_Species'].values  # variable dependiente
 df.info()
@@ -76,8 +76,6 @@ logistic = LogisticRegression()
 from sklearn.model_selection import train_test_split
 X_train, X_test, y_train, y_test = train_test_split(x, y, random_state=42)
 
-
-
 names = []
 accu_scores = []
 accuracies = []
@@ -95,27 +93,6 @@ y_pred = logistic.predict(X_test)
 print("Matriz de Confusión para ", name, confusion_matrix(y_test,y_pred))
 print("Reporte de Clasificación para ", name, classification_report(y_test,y_pred))
 
-logistic = LogisticRegression()
-logistic.fit(X_train, y_train)
-
-y_pred_RF = logistic.predict(X_test)
-
-df_pred = pd.DataFrame(y_pred_RF)
-df_pred.columns = ['Predicted Value']
-df_real = pd.DataFrame(y_test)
-df_real.columns = ['Real Values']
-
-df_sub = pd.read_csv('Iris.csv')
-df_sub = df_sub.drop('Species', axis = 1)
-
-# Reset index to prevent NaN values in concat result
-df_pred.reset_index(drop=True, inplace=True)
-df_sub.reset_index(drop=True, inplace=True)
-
-# True values y predicted values
-result = pd.concat([df_sub,df_pred,df_real], axis=1)
-result.head(50)
-
 from sklearn.model_selection import KFold
 from sklearn.metrics import make_scorer
 from sklearn.model_selection import cross_validate
@@ -131,7 +108,7 @@ m = veracity['test_score'].mean()
 sd = veracity['test_score'].std()
 
 
-print("Accuracy of the Linear Regretion", "model with k-fold cross validation")
+print("Accuracy of the Logistic Regretion", "model with k-fold cross validation")
 print("K-fold accuracies: ", acur)
 print("Mean :", m)
 print("Variance: ",var )
@@ -165,3 +142,100 @@ plt.plot(train_sizes, test_scores_mean, 'o-', color="#2DD6A0", label="Validació
 plt.ylim(-0.1, 1.1)
 plt.legend(loc="best")
 plt.show()
+
+from sklearn.model_selection import GridSearchCV
+from sklearn.model_selection import StratifiedKFold
+
+# Create the parameter grid based on the results of random search with iris dataset
+
+param_grid = {
+    'penalty': ['l1', 'l2', 'elasticnet', 'none'],
+    'C': [0.001, 0.01, 0.1, 1, 10, 100, 1000],
+    'solver': ['newton-cg', 'lbfgs', 'liblinear', 'sag', 'saga'],
+    'max_iter': [100, 1000, 2500, 5000]
+}
+
+# Instantiate the grid search model
+grid_search = GridSearchCV(estimator = logistic, param_grid = param_grid,
+                            cv = 3, n_jobs = -1, verbose = 2)
+
+grid_search.fit(X_train, y_train)
+
+grid_search.best_params_
+
+grid_search.best_score_
+
+grid_search.best_estimator_
+
+name ='Regresion Logistica'
+logistic = LogisticRegression(C=1, penalty='l1', solver='saga')
+
+logistic.fit(X_train, y_train)
+y_pred = logistic.predict(X_test)
+
+print("Matriz de Confusión para ", name, confusion_matrix(y_test,y_pred))
+print("Reporte de Clasificación para ", name, classification_report(y_test,y_pred))
+
+kfold = KFold(n_splits=30, shuffle=True, random_state=42)
+scorer = make_scorer(accuracy_score)
+
+veracity = cross_validate(logistic, x, y, cv=kfold, scoring=scorer)
+
+acur = veracity['test_score']
+var = veracity['test_score'].var()
+m = veracity['test_score'].mean()
+sd = veracity['test_score'].std()
+
+
+print("Accuracy of the Logistic Regretion", "model with k-fold cross validation")
+print("K-fold accuracies: ", acur)
+print("Mean :", m)
+print("Variance: ",var )
+print("Standard deviation: ", sd)
+print("Bias: ", 1 - m)
+
+train_sizes, train_scores, test_scores = learning_curve(logistic, X_test, y_test, cv=10, scoring='neg_mean_squared_error', n_jobs=-1, train_sizes=np.linspace(0.01, 1.0, 50), verbose=0)
+
+train_scores_mean = -train_scores.mean(axis = 1)
+train_scores_std = train_scores.std(axis = 1)
+test_scores_mean = -test_scores.mean(axis = 1)
+test_scores_std = test_scores.std(axis = 1)
+
+
+plt.figure(figsize=(25, 8))
+plt.style.use('seaborn-whitegrid')
+plt.title('Curva de Aprendizaje')
+plt.xlabel('Tamaño del Conjunto de Entrenamiento')
+plt.ylabel('Error Cuadrático Medio')
+plt.grid()
+
+plt.fill_between(train_sizes, train_scores_mean - train_scores_std, train_scores_mean + train_scores_std, alpha=0.1, color="r")
+plt.fill_between(train_sizes, test_scores_mean - test_scores_std, test_scores_mean + test_scores_std, alpha=0.1, color="#2DD6A0")
+
+plt.plot(train_sizes, train_scores_mean, 'o-', color="r", label="Entrenamiento")
+plt.plot(train_sizes, test_scores_mean, 'o-', color="#2DD6A0", label="Validación Cruzada")
+
+plt.ylim(-0.1, 1.1)
+plt.legend(loc="best")
+plt.show()
+
+def prediction(sepal_length,sepal_width,petal_length,petal_width):
+    plants = {0: 'Iris-setosa', 1: 'Iris-versicolor', 2: 'Iris-virginica'}
+    pred = logistic.predict([[sepal_length, sepal_width, petal_length, petal_width]])
+    print("La especie de la flor es: ", pred," ",plants[pred[0]])
+
+# Id	SepalLengthCm	SepalWidthCm	PetalLengthCm	PetalWidthCm  Species	    No_Species
+# 1	  5.1	          3.5	          1.4	          0.2	          Iris-setosa	0
+prediction(5.1,3.5,1.4,0.2) 
+# Id	SepalLengthCm	SepalWidthCm	PetalLengthCm	PetalWidthCm	Species	    No_Species
+# 51  7.0	          3.2	          4.7	          1.4	          Iris-versicolor	1
+prediction(7.0,3.2,4.7,1.4) 
+# Id	SepalLengthCm	SepalWidthCm	PetalLengthCm	PetalWidthCm	Species	    No_Species
+# 150	5.9	          3.0	          5.1	          1.8	          Iris-virginica	2
+prediction(5.9,3.0,5.1,1.8) 
+# Id	SepalLengthCm	SepalWidthCm	PetalLengthCm	PetalWidthCm	Species	    No_Species
+# 23	4.6	          3.6	          1.0	          0.2	          Iris-setosa	0	
+prediction(4.6,3.6,1.0,0.2)
+# Id	SepalLengthCm	SepalWidthCm	PetalLengthCm	PetalWidthCm	Species	    No_Species
+# 24	5.1	          3.3	          1.7	          0.5	          Iris-setosa	0
+prediction(5.1,3.3,1.7,0.5)
