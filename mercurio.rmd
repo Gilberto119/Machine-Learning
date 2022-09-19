@@ -1,0 +1,192 @@
+---
+title: "Mercurio"
+output: word_document: default
+author: 'Gilberto Ramos Salinas'
+date: "13 de septiembre de 2022"
+---
+
+La contaminación por mercurio de peces en el agua dulce comestibles es una amenaza directa contra nuestra salud. Se llevó a cabo un estudio reciente en 53 lagos de Florida con el fin de examinar los factores que influían en el nivel de contaminación por mercurio. Por ello, se decide realizar el siguiente estudio el cuaful pueda determinar la principales causas de esta problematica explicando las razones principales por las que se propicia la concentracion de mercurio.
+
+Estas son las variables que se utlizaran para realizar dicho estudio:
+X1 = número de indentificación
+X2 = nombre del lago
+X3 = alcalinidad (mg/l de carbonato de calcio)
+X4 = PH
+X5 = calcio (mg/l)
+X6 = clorofila (mg/l)
+X7 = concentración media de mercurio (parte por millón) en el tejido muscualar del grupo de peces estudiados en cada lago
+X8 = número de peces estudiados en el lago
+X9 = mínimo de la concentración de mercurio en cada grupo de peces
+X10 = máximo de la concentración de mercurio en cada grupo de peces
+X11 = estimación (mediante regresión) de la concentración de mercurio en el pez de 3 años (o promedio de mercurio cuando la edad no está disponible)
+X12 = indicador de la edad de los peces (0: jóvenes; 1: maduros)
+
+Alrededor de la principal pregunta de investigación que surge en este estudio: ¿Cuáles son los principales factores que influyen en el nivel de contaminación por mercurio en los peces de los lagos de Florida? pueden surgir preguntas paralelas que desglosan esta pregunta general:
+
+¿Hay evidencia para suponer que la concentración promedio de mercurio en los lagos es dañino para la salud humana? Considera que las normativas de referencia para evaluar los niveles máximos de Hg (Reglamento 34687-MAG y los reglamentos internacionales CE 1881/2006 y Codex Standard 193-1995) establecen que la concentración promedio de mercurio en productos de la pesca no debe superar los 0.5 mg de Hg/kg.
+¿Habrá diferencia significativa entre la concentración de mercurio por la edad de los peces?
+Si el muestreo se realizó lanzando una red y analizando los peces que la red encontraba ¿Habrá influencia del número de peces encontrados en la concentración de mercurio en los peces?
+¿Las concentraciones de alcalinidad, clorofila, calcio en el agua del lago influyen en la concentración de mercurio de los peces?
+```{r}
+knitr::opts_chunk$set(echo = FALSE)
+library(readxl)
+library(dplyr)
+library(ggplot2)
+library(GGally)
+library(Hmisc)
+library(corrplot)
+library(PerformanceAnalytics)
+
+```
+```{r}
+df = read.csv('C:\\Users\\grsjr\\Documents\\Data Analysis for Machine_Learning\\Stadistic Class\\mercurio.csv')
+knitr::opts_chunk$set(echo = FALSE)
+```
+```{r}
+colnames(df) <- c("Id", "Lake", "Alcalinity", "Ph", "Calcium", "Chlorophyl", "Mercury_con",
+                    "no_fish", "Mercury_min", "Mercury_max", "Mercury_avg", "Age")
+knitr::opts_chunk$set(echo = FALSE)
+```
+Por medio de la siguiente instruccion podemos conocer datos generales sobre las variables que se tienen que analizar.
+```{r}
+library(Hmisc)
+di <- describe(df)
+di
+```
+```{r}
+
+dfdrop = subset(df,select = -c(Id,Lake))
+correlacion = cor(dfdrop)
+```
+```{r}
+corrplot(correlacion, method="number")
+
+```
+A traves de esta informacion sabemos que existen varios datos que tienen una alta correlacion con Mercury_con como lo son: Mercury_Avg, Mercury_max, Mercury_min. Sin embargo, no podemos utilizar estas variables ya que son datos con una alta relacion. Por ello, se decidio agregar otra variable con menos relacion para conocer los parametros reales que producen una alta concentracion del mercurio como: Mercury_avg con otras variables como Chlorophyl que no tienen un correlacion tan grande entre ellas.
+
+Aplicacion del modelo lineal
+```{r}
+model=lm(Mercury_con~Alcalinity+Calcium+Mercury_avg,data=dfdrop)
+summary(model)
+```
+Selección del mejor modelo
+
+```{r}
+step(model,direction="both",trace=1)
+```
+```{r}
+model=lm(Mercury_con~Mercury_avg,data=dfdrop)
+summary(model)
+```
+A traves de esta informacion podemos inferir que Mecury_avg es significante para la prediccion ya que *** tiene un valor de 0.001 estando cerca del cero.
+
+Concentrado del Mercurio es =
+
+Pruebas de hipotesis
+
+H0:Beta1 = 0
+H1:Beta1 != 0
+
+```{r}
+a = 0.05
+len = nrow(dfdrop)
+tz = abs(qt(a/2,len-2))
+ts =  18.85
+
+if(ts>tz){
+  print("H0 se rechaza ")
+}else{
+  print("H1 se rechaza ")
+}
+
+```
+Por lo tanto la hipotesis 1 se acepta indicando que Beta1 se utiliza. Esto indica que Mercurio_avg tiene un valor significante para los resultados del modelo.
+
+Verificación de supuestos:
+
+Relacion Lineal
+```{r}
+plot(dfdrop$Mercury_avg,dfdrop$Mercury_con)
+abline(model, col='purple')
+```
+
+Por medio del siguiente diagrama se puede apreciar claramente como los datos poseen una relacion lineal
+
+Independencia los residuos
+```{r}
+n=length(dfdrop$Mercury_con)
+plot(c(1:n),model$residuals,type="l",xlab="Orden de las observaciones",ylab="Residuos")
+abline(h=0,col="red")
+```
+Los datos como pueden ser apreciados anteriormente poseen no tienen un tendencia defnida lo que nos indica que son totalmente indipendientes.
+
+Normalidad
+```{r}
+E=model$residuals
+Y=model$fitted.values
+
+qqnorm(E)
+qqline(E,col="red")
+
+hist(E,col="lightcyan",freq=FALSE,main="Histograma de Residuos",xlab="",ylab="Densidad")
+lines(density(E),col="red")
+curve(dnorm(x,mean=mean(E),sd=sd(E)), add=TRUE, col="blue",lwd=2)
+
+shapiro.test(E)
+
+```
+
+Los datos son distribuidos con normalidad.
+
+Homocedasticidad
+```{r}
+plot(Y,E,ylab="Residuos",xlab="Valores estimados",pch=20,col="red")
+abline(h=0,col="red")
+text(Y[],E[],1:30,cex=0.8,pos=3,offset=0.2)
+```
+Un modelo presenta homocedasticidad cuando existe una constancia en los errores de estimacion. Sin embargo, este modelo presenta heterocedasticidad, dado que la dispercion del error (varianza) no es igual en la mayoria de las variables.
+
+
+Conclusion:
+
+Acorde a los resultados anteriormente presentados podemos conocer que la variable Mercury_avg siendo la estimacion de mercurio que se encuentra en los peces en 3 años es uno indicador fuerte para la concentracion del mercurio en un lago. Esto fue verificado a lo largo de esto documento haciendo uso de hipotesis y de verificacion de supuestos. Sin embargo, podemos realizar nuevamente el estudio donde se descarte el maximo, minimo y estimacion del mercurio, ya que estas son variables que tienen una alta correlacion, pudiendo afectar al modelo. Con ello, podemos conseguir un modelo que demuestre las variables reales que afecten.
+
+
+```{r}
+newdfdrop = subset(dfdrop,select = -c(Mercury_min,Mercury_max,Mercury_avg))
+newcorrelacion = cor(newdfdrop)
+```
+
+```{r}
+corrplot(newcorrelacion, method="number")
+```
+```{r}
+newmodel=lm(Mercury_con~Alcalinity+Calcium,data=newdfdrop)
+summary(newmodel)
+```
+```{r}
+a = 0.05
+len = nrow(newdfdrop)
+tz = abs(qt(a/2,len-2))
+ts =  1.52
+
+if(ts>tz){
+  print("H0 se rechaza ")
+}else{
+  print("H1 se rechaza ")
+}
+
+```
+```{r}
+a = 0.05
+len = nrow(newdfdrop)
+tz = abs(qt(a/2,len-2))
+ts =  -4.22
+if(ts>tz){
+  print("H0 se rechaza ")
+}else{
+  print("H1 se rechaza ")
+}
+
+```
+Por medio del siguiennte analisis podemos apreciar que el modelo es bajo ya que r cuadrada tiene un valor de .35 y las vairables de alcalinidad y calcio tienen correlacion baja ya que H1 se rechaza.
